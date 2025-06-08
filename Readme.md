@@ -55,17 +55,34 @@
 6. **Прокси-сервер** - Nginx для балансировки нагрузки
     
 
-## Схема взаимодействия компонентов
-┌───────────┐     ┌───────────┐     ┌──────────────┐
-│  Клиент   │────▶│   Nginx   │────▶│  API сервис  │
-└───────────┘     └───────────┘     └──────┬───────┘
-                                           │
-                                           ▼
-┌───────────┐     ┌───────────┐     ┌──────────────┐
-│ML Worker  │◀───▶│  RabbitMQ │◀─│ PostgreSQL│
-└───────────┘     └───────────┘     └──────────────┘
+## Схема компонентов
+``` mermaid 
+graph TB
+    subgraph "Frontend Layer"
+        A[Streamlit UI] --> B[FastAPI Gateway]
+        A --> C[Web Interface]
+    end
+    subgraph "API Layer"
+        B --> D[Authentication Service]
+        B --> E[ML Prediction Service]
+        B --> F[Analytics Service]
+    end
+    subgraph "ML Layer"
+        E --> G[LightGBM Model]
+        E --> H[XGBoost Model]
+        E --> I[Stacking Ensemble]
+    end
+    subgraph "Data Layer"
+        J[PostgreSQL] --> K[Redis Cache]
+        L[RabbitMQ] --> M[ML Workers]
+        N[Airflow ETL] --> J
+    end
 
-
+    subgraph "Monitoring"
+        O[Prometheus] --> P[Grafana]
+        Q[Health Checks] --> O
+    end
+```
 ## Технологии
 
 - **Backend**: Python 3.12, FastAPI, SQLModel
