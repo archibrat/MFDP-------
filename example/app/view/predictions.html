@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+
+{% block title %}ML Предсказания{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.prediction-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.prediction-form {
+    background: #f8f9fa;
+    padding: 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-group input, .form-group select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.prediction-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 5px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.prediction-button:hover {
+    transform: translateY(-2px);
+}
+
+.prediction-result {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    margin-top: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.risk-indicator {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.risk-low { background: #d4edda; color: #155724; }
+.risk-medium { background: #fff3cd; color: #856404; }
+.risk-high { background: #f8d7da; color: #721c24; }
+
+.recommendations {
+    background: #e7f3ff;
+    padding: 15px;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+
+.recommendations ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.batch-upload {
+    background: #e8f5e8;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 30px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    transition: width 0.5s ease;
+}
+
+.analytics-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.metric-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.metric-label {
+    color: #666;
+    margin-top: 10px;
+}
+</style>
+<script src="https://unpkg.com/htmx.org@1.8.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="prediction-container">
+    <h1>🔮 ML Предсказания медицинских услуг</h1>
+    
+    {% if user %}
+    <!-- Форма единичного предсказания -->
+    <div class="prediction-form">
+        <h2>Предсказание риска неявки пациента</h2>
+        <form hx-post="/api/predictions/predict" 
+              hx-target="#prediction-result" 
+              hx-swap="innerHTML"
+              hx-indicator="#loading">
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="client_id">ID клиента</label>
+                    <input type="text" name="client_id" id="client_id" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="booking_id">ID записи</label>
+                    <input type="text" name="booking_id" id="booking_id" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="age">Возраст</label>
+                    <input type="number" name="age" id="age" min="0" max="120" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">Пол</label>
+                    <select name="gender" id="gender" required>
+                        <option value="">Выберите</option>
+                        <option value="m">Мужской</option>
+                        <option value="f">Женский</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="district">Район</label>
+                    <input type="text" name="district" id="district" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="scholarship">Льготник</label>
+                    <select name="scholarship" id="scholarship">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="condition_a">Гипертония</label>
+                    <select name="condition_a" id="condition_a">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="condition_b">Диабет</label>
+                    <select name="condition_b" id="condition_b">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="condition_c">Алкоголизм</label>
+                    <select name="condition_c" id="condition_c">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="accessibility_level">Уровень инвалидности</label>
+                    <select name="accessibility_level" id="accessibility_level">
+                        <option value="0">Нет</option>
+                        <option value="1">1 группа</option>
+                        <option value="2">2 группа</option>
+                        <option value="3">3 группа</option>
+                        <option value="4">4 группа</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notification_sent">SMS отправлено</label>
+                    <select name="notification_sent" id="notification_sent">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="planned_date">Дата записи</label>
+                    <input type="datetime-local" name="planned_date" id="planned_date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="session_date">Дата приема</label>
+                    <input type="datetime-local" name="session_date" id="session_date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="include_explanation">Включить объяснение</label>
+                    <select name="include_explanation" id="include_explanation">
+                        <option value="false">Нет</option>
+                        <option value="true">Да</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button type="submit" class="prediction-button">
+                🚀 Получить предсказание
+            </button>
+            
+            <div id="loading" class="htmx-indicator">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 100%; animation: pulse 1.5s infinite;"></div>
+                </div>
+                Обработка запроса...
+            </div>
+        </form>
+    </div>
+    
+    <!-- Результат предсказания -->
+    <div id="prediction-result" class="prediction-result" style="display: none;">
+        <!-- Результат будет загружен через HTMX -->
+    </div>
+    
+    <!-- Пакетная загрузка -->
+    <div class="batch-upload">
+        <h2>📊 Пакетная обработка</h2>
+        <form hx-post="/api/predictions/predict/batch" 
+              hx-target="#batch-result"
+              hx-encoding="multipart/form-data">
+            
+            <div class="form-group">
+                <label for="batch_file">Загрузить CSV файл с данными пациентов</label>
+                <input type="file" name="batch_file" id="batch_file" accept=".csv" required>
+            </div>
+            
+            <button type="submit" class="prediction-button">
+                📤 Загрузить пакет
+            </button>
+        </form>
+        
+        <div id="batch-result"></div>
+    </div>
+    
+    <!-- Аналитический дашборд -->
+    <div class="analytics-dashboard">
+        <div class="metric-card" hx-get="/api/predictions/analytics/performance" 
+             hx-trigger="load, every 30s">
+            <div class="metric-value" id="accuracy-metric">--</div>
+            <div class="metric-label">Точность модели</div>
+        </div>
+        
+        <div class="metric-card" hx-get="/api/predictions/models/status" 
+             hx-trigger="load, every 60s">
+            <div class="metric-value" id="predictions-count">--</div>
+            <div class="metric-label">Предсказаний за сегодня</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="model-version">v2.0</div>
+            <div class="metric-label">Версия модели</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-value" id="response-time">--ms</div>
+            <div class="metric-label">Время ответа</div>
+        </div>
+    </div>
+    
+    <!-- График производительности -->
+    <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 10px;">
+        <h3>📈 Производительность модели</h3>
+        <canvas id="performanceChart" width="400" height="200"></canvas>
+    </div>
+    
+    {% else %}
+    <div class="prediction-form">
+        <h2>🔒 Доступ ограничен</h2>
+        <p>Для использования ML-функций необходимо <a href="/auth/login">войти в систему</a>.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Инициализация графика производительности
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Точность',
+                data: [],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'F1-Score',
+                data: [],
+                borderColor: '#764ba2',
+                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Метрики модели по времени'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            }
+        }
+    });
+    
+    // Загрузка данных для графика
+    loadPerformanceData(chart);
+    
+    // Обновление каждые 5 минут
+    setInterval(() => loadPerformanceData(chart), 300000);
+});
+
+async function loadPerformanceData(chart) {
+    try {
+        const response = await fetch('/api/predictions/analytics/performance?days=7');
+        const data = await response.json();
+        
+        chart.data.labels = data.dates;
+        chart.data.datasets[0].data = data.accuracy;
+        chart.data.datasets[1].data = data.f1_score;
+        chart.update();
+        
+        // Обновление метрик
+        document.getElementById('accuracy-metric').textContent = 
+            (data.accuracy[data.accuracy.length - 1] * 100).toFixed(1) + '%';
+            
+    } catch (error) {
+        console.error('Ошибка загрузки данных производительности:', error);
+    }
+}
+
+// Обработка результата предсказания
+document.body.addEventListener('htmx:afterRequest', function(event) {
+    if (event.detail.target.id === 'prediction-result') {
+        document.getElementById('prediction-result').style.display = 'block';
+        
+        // Анимация появления результата
+        event.detail.target.style.opacity = '0';
+        event.detail.target.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            event.detail.target.style.transition = 'all 0.5s ease';
+            event.detail.target.style.opacity = '1';
+            event.detail.target.style.transform = 'translateY(0)';
+        }, 100);
+    }
+});
+
+// Автозаполнение демо-данными
+function fillDemoData() {
+    document.getElementById('client_id').value = 'DEMO_001';
+    document.getElementById('booking_id').value = 'BOOK_' + Date.now();
+    document.getElementById('age').value = '45';
+    document.getElementById('gender').value = 'f';
+    document.getElementById('district').value = 'Центральный';
+    document.getElementById('condition_a').value = 'true';
+    
+    const now = new Date();
+    const planDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // вчера
+    const sessDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // завтра
+    
+    document.getElementById('planned_date').value = planDate.toISOString().slice(0, 16);
+    document.getElementById('session_date').value = sessDate.toISOString().slice(0, 16);
+}
+
+// Добавляем кнопку демо-данных
+window.addEventListener('load', function() {
+    const form = document.querySelector('.prediction-form form');
+    const demoButton = document.createElement('button');
+    demoButton.type = 'button';
+    demoButton.className = 'prediction-button';
+    demoButton.style.background = '#28a745';
+    demoButton.style.marginRight = '10px';
+    demoButton.textContent = '🎯 Демо-данные';
+    demoButton.onclick = fillDemoData;
+    
+    form.insertBefore(demoButton, form.querySelector('button[type="submit"]'));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,241 @@
+version: "3.8"
+
+services:
+  app:
+    build: 
+      context: ./app/
+      target: production
+    image: event-planner-api:v2.0
+    container_name: event-planner-api
+    restart: unless-stopped
+    env_file:
+      - ./app/.env
+    volumes:
+      - ./app:/app
+      - ml_models:/app/models
+    depends_on:
+      db:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - event-planner-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ML воркеры с автоскейлингом
+  ml_worker_primary:
+    build: 
+      context: ./ml_worker/
+      dockerfile: Dockerfile.ml
+    image: event-planner-ml-worker:v2.0
+    container_name: ml-worker-primary
+    restart: unless-stopped
+    environment:
+      - WORKER_QUEUE=high_priority
+      - WORKER_TYPE=primary
+      - WORKER_CONCURRENCY=4
+    volumes:
+      - ./ml_worker:/app
+      - ml_models:/app/models
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - event-planner-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  ml_worker_secondary:
+    build: 
+      context: ./ml_worker/
+      dockerfile: Dockerfile.ml
+    image: event-planner-ml-worker:v2.0
+    restart: unless-stopped
+    environment:
+      - WORKER_QUEUE=normal_priority
+      - WORKER_TYPE=secondary
+      - WORKER_CONCURRENCY=2
+    volumes:
+      - ./ml_worker:/app
+      - ml_models:/app/models
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - event-planner-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Дополнительные ML воркеры для пиковых нагрузок
+  ml_worker_batch:
+    build: 
+      context: ./ml_worker/
+      dockerfile: Dockerfile.ml
+    image: event-planner-ml-worker:v2.0
+    restart: unless-stopped
+    environment:
+      - WORKER_QUEUE=batch_processing
+      - WORKER_TYPE=batch
+      - WORKER_CONCURRENCY=1
+    volumes:
+      - ./ml_worker:/app
+      - ml_models:/app/models
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - event-planner-network
+    profiles:
+      - batch
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  # Redis для кэширования предсказаний
+  redis:
+    image: redis:7-alpine
+    container_name: event-planner-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - event-planner-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Мониторинг с Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: event-planner-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - event-planner-network
+    profiles:
+      - monitoring
+
+  # Grafana для визуализации метрик
+  grafana:
+    image: grafana/grafana:latest
+    container_name: event-planner-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3000:3000"
+    networks:
+      - event-planner-network
+    profiles:
+      - monitoring
+
+  # Автохилер для перезапуска упавших контейнеров
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: event-planner-autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    profiles:
+      - autoheal
+
+  web:
+    image: nginx:latest
+    container_name: event-planner-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - event-planner-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: event-planner-db
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - event-planner-network
+
+  rabbitmq:
+    image: rabbitmq:3.13.1-management-alpine
+    container_name: rabbitmq_for_planner
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit disk_free_limit 2147483648
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+    networks:
+      - event-planner-network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  ml_models:
+
+networks:
+  event-planner-network:
+    name: event-planner-network
+    driver: bridge
