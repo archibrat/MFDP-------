@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     DB_USER: str = "postgres"
     DB_PASS: str = "postgres"
     DB_NAME: str = "medical_db"
-    SECRET_KEY: str = "ef7cb39b5097a96e496ee87383cf9d853706151497015a826120db8e25084ef3"
+    SECRET_KEY: str = ""#Вернуть
     COOKIE_NAME: str = "session"
     APP_NAME: str = "medical_ml"
     APP_DESCRIPTION: str = "Medical ML API"
