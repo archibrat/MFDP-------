@@ -30,7 +30,7 @@ def create_application() -> FastAPI:
         redoc_url="/api/redoc"
     )
     
-    app.add_middleware(Analytics, api_key="39d40b20-6328-4a67-ae74-940f0cab5737")  # Добавление промежуточного слоя
+    app.add_middleware(Analytics, api_key="")  # Добавление промежуточного слоя. Вернуть api_key
 
     # Настройка CORS
     app.add_middleware(
