@@ -14,9 +14,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Копирование requirements
-COPY requirements.ml.txt /app/
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.ml.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Промежуточный слой для разработки
 FROM base as development

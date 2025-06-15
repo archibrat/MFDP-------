@@ -56,14 +56,36 @@
     
 
 ## Схема взаимодействия компонентов
-┌───────────┐     ┌───────────┐     ┌──────────────┐
-│  Клиент   │────▶│   Nginx   │────▶│  API сервис  │
-└───────────┘     └───────────┘     └──────┬───────┘
-                                           │
-                                           ▼
-┌───────────┐     ┌───────────┐     ┌──────────────┐
-│ML Worker  │◀───▶│  RabbitMQ │◀─│ PostgreSQL│
-└───────────┘     └───────────┘     └──────────────┘
+
+``` mermaid 
+graph TB
+    subgraph "Frontend Layer"
+        A[Streamlit UI] --> B[FastAPI Gateway]
+        A --> C[Web Interface]
+    end
+    subgraph "API Layer"
+        B --> D[Authentication Service]
+        B --> E[ML Prediction Service]
+        B --> F[Analytics Service]
+    end
+    subgraph "ML Layer"
+        E --> G[LightGBM Model]
+        E --> H[XGBoost Model]
+        E --> I[Stacking Ensemble]
+    end
+    subgraph "Data Layer"
+        J[PostgreSQL] --> K[Redis Cache]
+        L[RabbitMQ] --> M[ML Workers]
+        N[Airflow ETL] --> J
+    end
+
+    subgraph "Monitoring"
+        O[Prometheus] --> P[Grafana]
+        Q[Health Checks] --> O
+    end
+```
+
+
 
 
 ## Технологии
@@ -175,6 +197,24 @@ http://localhost:3000 # Grafana (admin/admin123)
 ├── docker-compose.yaml   # Конфигурация Docker Compose
 ├── Dockerfile            # Сборка основного приложения
 └── README.md             # Документация проекта
+
+medical-ml-platform/
+├── app/                    # Основное приложение FastAPI
+│   ├── api/               # API routes
+│   ├── core/              # Конфигурация и настройки
+│   ├── models/            # SQLModel модели
+│   ├── services/          # Бизнес-логика
+│   └── main.py           # Точка входа FastAPI
+├── ml_worker/             # ML воркеры
+│   ├── models/           # ML модели
+│   ├── preprocessing/    # Обработка данных
+│   └── training/         # Обучение моделей
+├── dags/                  # Airflow DAGs
+├── monitoring/            # Конфигурация мониторинга
+├── scripts/              # Утилиты и скрипты
+├── tests/                # Тесты
+├── docker-compose.yml    # Docker конфигурация
+└── requirements.txt      # Python зависимости
 
 ## API
 

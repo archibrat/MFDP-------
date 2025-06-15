@@ -4,7 +4,7 @@ services:
   app:
     build: 
       context: ./app/
-      target: production
+       #target: production
     image: event-planner-api:v2.0
     container_name: event-planner-api
     restart: unless-stopped
@@ -32,10 +32,10 @@ services:
   # ML воркеры с автоскейлингом
   ml_worker_primary:
     build: 
-      context: ./ml_worker/
-      dockerfile: Dockerfile.ml
+      context: ./app/
+      dockerfile: Dockerfile
     image: event-planner-ml-worker:v2.0
-    container_name: ml-worker-primary
+    #container_name: ml-worker-primary0986
     restart: unless-stopped
     environment:
       - WORKER_QUEUE=high_priority
@@ -62,8 +62,8 @@ services:
 
   ml_worker_secondary:
     build: 
-      context: ./ml_worker/
-      dockerfile: Dockerfile.ml
+      context: ./app/
+      dockerfile: Dockerfile
     image: event-planner-ml-worker:v2.0
     restart: unless-stopped
     environment:
@@ -88,8 +88,8 @@ services:
   # Дополнительные ML воркеры для пиковых нагрузок
   ml_worker_batch:
     build: 
-      context: ./ml_worker/
-      dockerfile: Dockerfile.ml
+      context: ./app/
+      dockerfile: Dockerfile
     image: event-planner-ml-worker:v2.0
     restart: unless-stopped
     environment:
@@ -217,8 +217,8 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "15673:15672"
+      - "5673:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 20s

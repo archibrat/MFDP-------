@@ -1,8 +1,8 @@
 import time
-from datetime import datetime
-from fastapi import HTTPException, status 
+from datetime import datetime, timezone
+from fastapi import HTTPException, status
 from jose import jwt, JWTError
-from database.database import get_settings
+from database.config import get_settings
 
 # Получаем настройки приложения
 settings = get_settings()
@@ -23,8 +23,7 @@ def create_access_token(user: str) -> str:
     "user": user,
     "expires": time.time() + 3600  # Срок действия токена - 1 час
     }
-    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    return token
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 def verify_access_token(token: str) -> dict:
     """
@@ -44,16 +43,16 @@ def verify_access_token(token: str) -> dict:
         data = jwt.decode(token, SECRET_KEY, 
         algorithms=["HS256"])
         expire = data.get("expires")
-        
+
         # Проверяем наличие времени истечения
         if expire is None:
             raise HTTPException( 
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="No access token supplied"
             )
-            
+
         # Проверяем, не истек ли срок действия токена
-        if datetime.utcnow() > datetime.utcfromtimestamp(expire):
+        if datetime.now(timezone.utc) > datetime.fromtimestamp(expire):
             raise HTTPException( 
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Token expired!"
