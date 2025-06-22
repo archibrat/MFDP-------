@@ -9,7 +9,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from models.prediction import PatientData, PredictionResult, PredictionType
-from schemas.prediction import PredictionRequest, PredictionResponse
+from models.prediction import PredictionRequest, PredictionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,6 @@ class MLService:
         return success
     
     def _initialize_components(self):
-        """Инициализация компонентов из paste.txt"""
-        # Импортируем классы из paste.txt
         from services.ml.feature_engineering import AdvancedFeatureEngineering
         from services.ml.model_interpreter import ModelInterpreter
         

@@ -159,7 +159,7 @@ class TestMLService:
     async def test_prediction_generation(self, test_patient_data):
         """Тест генерации предсказания"""
         from services.ml_service import MLService
-        from schemas.prediction import PredictionRequest, PatientDataCreate
+        from models.prediction import PredictionRequest, PatientDataCreate
         
         ml_service = MLService()
         await ml_service.initialize()

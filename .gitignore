@@ -17,3 +17,4 @@ datasets/
 *.xlsx
 *.xls
 local/
+data/

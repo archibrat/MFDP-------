@@ -9,7 +9,7 @@ from datetime import datetime
 from database.database import get_session
 from services.ml_service import get_ml_service, MLService
 from services.crud.prediction import PredictionService
-from schemas.prediction import (
+from models.prediction import (
     PredictionRequest, PredictionResponse, BatchPredictionRequest,
     ModelStatusResponse, PatientDataCreate
 )
@@ -166,8 +166,7 @@ async def get_patient_prediction_history(
     user: str = Depends(authenticate)
 ):
     """Получение истории предсказаний для пациента"""
-    history = await prediction_service.get_patient_history(patient_id, limit)
-    return history
+    return await prediction_service.get_patient_history(patient_id, limit)
 
 @prediction_route.get("/analytics/performance")
 async def get_model_performance_analytics(
@@ -177,8 +176,7 @@ async def get_model_performance_analytics(
     user: str = Depends(authenticate)
 ):
     """Получение аналитики производительности модели"""
-    analytics = await prediction_service.get_performance_analytics(days, model_version)
-    return analytics
+    return await prediction_service.get_performance_analytics(days, model_version)
 
 # Вспомогательные функции
 async def _process_batch_predictions(
