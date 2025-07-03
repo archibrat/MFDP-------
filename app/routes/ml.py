@@ -3,11 +3,13 @@ from typing import Dict, List
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session
 from database.database import get_session
-from models.mltask import MLTask, TaskStatus, MLTaskCreate
+from app.models.mltask import MLTask, TaskStatus, MLTaskCreate
+from app.models.prediction import PredictionRequest, PredictionResponse
 from services.rm.rm import rabbit_client
-from services.rm.rpc import rpc_client
+from services.rm.rpc import get_rpc_client
 from services.logging.logging import get_logger
 from services.crud.mltask import MLTaskService
+from services.ml_service import get_ml_service, MLService
 
 logging.getLogger('pika').setLevel(logging.INFO)
 
@@ -24,7 +26,7 @@ def get_mltask_service(session: Session = Depends(get_session)) -> MLTaskService
     summary="ML endpoint",
     description="Send ml request"
 )
-async def send_task(message: str, user_id: int, mltask_service: MLTaskService = Depends(get_mltask_service)) -> str:
+async def send_task(message: str, user_id: int, mltask_service: MLTaskService = Depends(get_mltask_service)) -> Dict[str, str]:
     """
     Root endpoint returning welcome message.
 
@@ -39,10 +41,11 @@ async def send_task(message: str, user_id: int, mltask_service: MLTaskService = 
 
         logger.info(f"Sending task to RabbitMQ: {message}")
         rabbit_client.send_task(created_task)
-        mltask_service.set_status(created_task.id, TaskStatus.QUEUED)
+        if created_task and created_task.id:
+            mltask_service.set_status(created_task.id, TaskStatus.QUEUED)
         return {"message": "Task sent successfully!"}
     except Exception as e:
-        if created_task:
+        if created_task and created_task.id:
             mltask_service.set_status(created_task.id, TaskStatus.FAILED)
         logger.error(f"Unexpected error in sending task: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -100,16 +103,21 @@ async def send_task_rpc(
         ml_task = mltask_service.create(task_create) 
 
         logger.info(f"Sending RPC request with message: {message}")
-        result = rpc_client.call(text=message)
+        rpc_client = get_rpc_client()
+        if rpc_client:
+            result = rpc_client.call(text=message)
+        else:
+            result = "RPC client недоступен"
         logger.info(f"Received RPC response: {result}")
 
         # Update task with result using service
-        mltask_service.set_result(ml_task.id, result)
+        if ml_task and ml_task.id:
+            mltask_service.set_result(ml_task.id, result)
         
         return {"original": message, "processed": result}
     except Exception as e:
         logger.error(f"Unexpected error in RPC call: {str(e)}")
-        if ml_task:
+        if ml_task and ml_task.id:
             mltask_service.set_status(ml_task.id, TaskStatus.FAILED)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
@@ -130,3 +138,33 @@ async def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@ml_route.post("/predict", response_model=Dict[str, str])
+async def predict(
+    request: PredictionRequest,
+    ml_service: MLService = Depends(get_ml_service)
+):
+    """
+    Endpoint для предсказания неявок пациентов.
+    
+    Args:
+        request: Запрос с данными пациента
+        
+    Returns:
+        Dict с результатом предсказания
+    """
+    try:
+        # Выполняем предсказание
+        response = await ml_service.predict(request)
+        
+        return {
+            "prediction_value": str(response.prediction_value),
+            "confidence_score": str(response.confidence_score),
+            "risk_level": response.risk_level,
+            "recommendations": ",".join(response.recommendations),
+            "model_version": response.model_version
+        }
+    except Exception as e:
+        logger.error(f"Ошибка предсказания: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка предсказания: {str(e)}")

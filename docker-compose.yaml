@@ -3,19 +3,18 @@ version: "3.8"
 services:
   app:
     build: 
-      context: ./app/
-       #target: production
+      context: ./
+      target: app
     image: event-planner-api:v2.0
     container_name: event-planner-api
     restart: unless-stopped
     env_file:
-      - ./app/.env
+      - ./.env
     volumes:
-      - ./app:/app
       - ml_models:/app/models
     depends_on:
-      db:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -32,17 +31,17 @@ services:
   # ML воркеры с автоскейлингом
   ml_worker_primary:
     build: 
-      context: ./app/
-      dockerfile: Dockerfile
+      context: ./
+      target: ml-worker
     image: event-planner-ml-worker:v2.0
-    #container_name: ml-worker-primary0986
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
       - WORKER_QUEUE=high_priority
       - WORKER_TYPE=primary
       - WORKER_CONCURRENCY=4
     volumes:
-      - ./ml_worker:/app
       - ml_models:/app/models
     depends_on:
       rabbitmq:
@@ -62,16 +61,17 @@ services:
 
   ml_worker_secondary:
     build: 
-      context: ./app/
-      dockerfile: Dockerfile
+      context: ./
+      target: ml-worker
     image: event-planner-ml-worker:v2.0
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
       - WORKER_QUEUE=normal_priority
       - WORKER_TYPE=secondary
       - WORKER_CONCURRENCY=2
     volumes:
-      - ./ml_worker:/app
       - ml_models:/app/models
     depends_on:
       rabbitmq:
@@ -88,16 +88,17 @@ services:
   # Дополнительные ML воркеры для пиковых нагрузок
   ml_worker_batch:
     build: 
-      context: ./app/
-      dockerfile: Dockerfile
+      context: ./
+      target: ml-worker
     image: event-planner-ml-worker:v2.0
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
       - WORKER_QUEUE=batch_processing
       - WORKER_TYPE=batch
       - WORKER_CONCURRENCY=1
     volumes:
-      - ./ml_worker:/app
       - ml_models:/app/models
     depends_on:
       rabbitmq:
@@ -117,6 +118,8 @@ services:
     image: redis:7-alpine
     container_name: event-planner-redis
     restart: unless-stopped
+    env_file:
+      - ./.env
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -192,18 +195,27 @@ services:
     networks:
       - event-planner-network
 
-  db:
+  postgres:
     image: postgres:16-alpine
-    container_name: event-planner-db
+    container_name: mfdp-postgres
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: medical_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - ./app/database/migrations:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
     networks:
       - event-planner-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfdp_user -d mfdp_database"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   rabbitmq:
     image: rabbitmq:3.13.1-management-alpine

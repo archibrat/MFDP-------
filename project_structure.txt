@@ -3,6 +3,7 @@ MFDP_main/
     .env
     .env.example
     .gitignore
+    api.py
     docker-compose.yaml
     project_structure.txt
     Readme.md
@@ -12,8 +13,8 @@ MFDP_main/
     app/
         .DS_Store
         .env
-        api.py
         Dockerfile
+        middleware.py
         requirements.txt
         auth/
             .DS_Store
@@ -31,6 +32,8 @@ MFDP_main/
             database.py
             initdb.py
             __init__.py
+        exceptions/
+            base_exception.py
         logs/
             myapp.log
         models/
@@ -67,10 +70,15 @@ MFDP_main/
                 __init__.py
             crud/
                 .DS_Store
+                crud_events.py
+                crud_ml.py
+                crud_users.py
                 event.py
                 mltask.py
                 user.py
                 __init__.py
+            http/
+                base_service.py
             logging/
                 .DS_Store
                 logging.py
@@ -103,18 +111,14 @@ MFDP_main/
             private.html
             _site_map.html
     local/
-        4.Baseline документация.md
+        4.Baseline пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.md
         4.Baseline.ipynb
         auth_dependencies.py
         auth_system.py
         base_event.py
-        base_exception.py
         base_hooks.py
         base_users.py
         better_baseline.ipynb
-        crud_events.py
-        crud_ml.py
-        crud_users.py
         event_schema.py
         http_base.py
         http_client_ml_worker.py
@@ -122,10 +126,8 @@ MFDP_main/
         ml_pydantic.py
         ml_schema.py
         MVP.txt
-        RMQ.py
-        rmq_asynch.py
         tree_structure.py
-        Финализированная структура проекта .txt
+        пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ .txt
     ml_worker/
         .DS_Store
         Dockerfile
@@ -138,8 +140,10 @@ MFDP_main/
         models/
         rmq/
             .DS_Store
+            RMQ.py
             rmqconf.py
             rmqworker.py
+            rmq_asynch.py
             rpcworker.py
     nginx/
         nginx.conf
@@ -148,6 +152,4 @@ MFDP_main/
         app.py
         data/
             .DS_Store
-            iris.csv
-            iris2.csv
-            iris3.csv
+           

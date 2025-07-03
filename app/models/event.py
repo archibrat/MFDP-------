@@ -1,50 +1,58 @@
 from datetime import datetime
+from typing import List, Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List, TYPE_CHECKING
+from enum import Enum
 
 # Условный импорт для избежания циклических зависимостей
 if TYPE_CHECKING:
-    from models.user import User
-    from models.mltask import MLTask
+    from app.models.user import User
+    from app.models.mltask import MLTask
+
+class EventType(str, Enum):
+    APPOINTMENT = "appointment"
+    CONSULTATION = "consultation"
+    EXAMINATION = "examination"
+    OPERATION = "operation"
+    FOLLOW_UP = "follow_up"
+
+class EventPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class EventStatus(str, Enum):
+    SCHEDULED = "scheduled"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
 
 class EventBase(SQLModel):
-    """
-    Базовая модель события с общими полями.
-    
-    Атрибуты:
-        title (str): Название события
-        image (str): URL или путь к изображению события
-        description (str): Описание события
-        location (Optional[str]): Место проведения события
-    """
-    # Основные поля модели
-    title: str = Field(..., min_length=1, max_length=100)  # Название события (от 1 до 100 символов)
-    image: str = Field(..., min_length=1)  # Ссылка на изображение (не пустая)
-    description: str = Field(..., min_length=1, max_length=1000)  # Описание события (от 1 до 1000 символов)
+    """Базовая модель события"""
+    event_type: EventType = Field(description="Тип события")
+    patient_id: int = Field(description="ID пациента")
+    scheduled_time: datetime = Field(description="Запланированное время")
+    description: str = Field(max_length=1000, description="Описание события")
+    priority: EventPriority = Field(default=EventPriority.MEDIUM, description="Приоритет")
+    status: EventStatus = Field(default=EventStatus.SCHEDULED, description="Статус события")
+    sms_received: bool = Field(default=False, description="SMS получено")
 
 class Event(EventBase, table=True):
-    """
-    Модель события для хранения в базе данных.
+    """Модель события для хранения в базе данных"""
+    __tablename__ = "events"
     
-    Атрибуты:
-        id (Optional[int]): Первичный ключ
-        creator_id (Optional[int]): Внешний ключ к таблице пользователей
-        creator (Optional[User]): Связь с моделью пользователя
-        created_at (datetime): Временная метка создания события
-    """
-    # Поля для базы данных
-    id: Optional[int] = Field(default=None, primary_key=True)  # ID события
-    creator_id: Optional[int] = Field(default=None, foreign_key="user.id")  # ID создателя события
-    creator: Optional["User"] = Relationship(  # Связь с создателем события
+    id: Optional[int] = Field(default=None, primary_key=True)
+    creator_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    creator: Optional["User"] = Relationship(
         back_populates="events",
         sa_relationship_kwargs={"lazy": "selectin"}
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)  # Дата и время создания
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     
     def __str__(self) -> str:
         """Возвращает строковое представление события"""
-        result = (f"Id: {self.id}. Title: {self.title}. Creator: {self.creator.email}")
-        return result
+        return f"Id: {self.id}. Type: {self.event_type}. Patient: {self.patient_id}"
     
     @property
     def short_description(self) -> str:
@@ -58,13 +66,16 @@ class EventCreate(EventBase):
     """Схема для создания новых событий"""
     pass
 
-class EventUpdate(EventBase):
+class EventUpdate(SQLModel):
     """Схема для обновления существующих событий"""
-    # Необязательные поля для обновления
-    title: Optional[str] = None  # Необязательное название
-    image: Optional[str] = None  # Необязательное изображение
-    description: Optional[str] = None  # Необязательное описание
+    event_type: Optional[EventType] = None
+    patient_id: Optional[int] = None
+    scheduled_time: Optional[datetime] = None
+    description: Optional[str] = None
+    priority: Optional[EventPriority] = None
+    status: Optional[EventStatus] = None
+    sms_received: Optional[bool] = None
 
     class Config:
         """Конфигурация модели"""
-        validate_assignment = True  # Включение валидации при присваивании значений
+        validate_assignment = True

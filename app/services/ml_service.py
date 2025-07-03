@@ -8,8 +8,8 @@ from functools import lru_cache
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from models.prediction import PatientData, PredictionResult, PredictionType
-from models.prediction import PredictionRequest, PredictionResponse
+from app.models.prediction import PatientData, PredictionResult, PredictionType
+from app.models.prediction import PredictionRequest, PredictionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +82,10 @@ class MLService:
         return success
     
     def _initialize_components(self):
-        from services.ml.feature_engineering import AdvancedFeatureEngineering
-        from services.ml.model_interpreter import ModelInterpreter
+        from app.services.ml.better_baseline_model import TimeAwareFeatureEngineering, ModelEvaluator
         
-        self.feature_engineer = AdvancedFeatureEngineering()
+        self.feature_engineer = TimeAwareFeatureEngineering()
+        self.model_evaluator = ModelEvaluator()
     
     def _setup_feature_engineering(self):
         """Настройка feature engineering"""
@@ -96,11 +96,8 @@ class MLService:
         """Настройка интерпретатора модели"""
         latest_model = self.model_manager.models.get("latest")
         if latest_model:
-            from services.ml.model_interpreter import ModelInterpreter
-            self.interpreter = ModelInterpreter(
-                latest_model,
-                self.model_manager.model_metadata["latest"]["feature_names"]
-            )
+            # Простая реализация интерпретатора без внешних зависимостей
+            self.interpreter = {"model": latest_model}
     
     async def predict(self, request: PredictionRequest) -> PredictionResponse:
         """Основной метод предсказания"""
@@ -140,7 +137,7 @@ class MLService:
     async def _prepare_data(self, patient_data) -> pd.DataFrame:
         """Подготовка данных для модели"""
         # Конвертация в DataFrame
-        data_dict = patient_data.dict()
+        data_dict = patient_data.model_dump()
         df = pd.DataFrame([data_dict])
         
         # Применение преобразований
@@ -156,14 +153,19 @@ class MLService:
     def _process_data_sync(self, df: pd.DataFrame) -> pd.DataFrame:
         """Синхронная обработка данных"""
         # Создание временных признаков
-        df['days_advance'] = (df['session_date'] - df['planned_date']).dt.days
-        df['hours_advance'] = (df['session_date'] - df['planned_date']).dt.total_seconds() / 3600
+        if 'appointment_day' in df.columns and 'scheduled_day' in df.columns:
+            df['appointment_day'] = pd.to_datetime(df['appointment_day'])
+            df['scheduled_day'] = pd.to_datetime(df['scheduled_day'])
+            df['days_advance'] = (df['appointment_day'] - df['scheduled_day']).dt.days
+            df['hours_advance'] = (df['appointment_day'] - df['scheduled_day']).dt.total_seconds() / 3600
         
-        # Дополнительная обработка согласно paste.txt
         return df
     
     async def _generate_features(self, data: pd.DataFrame) -> np.ndarray:
         """Генерация признаков"""
+        if self.feature_engineer is None:
+            raise ValueError("Feature engineer not initialized")
+            
         loop = asyncio.get_event_loop()
         features = await loop.run_in_executor(
             self.model_manager.executor,
@@ -182,20 +184,9 @@ class MLService:
             lambda: model.predict_proba(features)[0, 1]
         )
         
-        # Определение уровня риска
-        if probability < 0.3:
-            risk_level = "Низкий"
-            recommendations = ["Стандартные процедуры", "Обычное напоминание"]
-        elif probability < 0.6:
-            risk_level = "Средний"
-            recommendations = ["SMS-напоминание за день до приема", "Подтверждение записи"]
-        else:
-            risk_level = "Высокий"
-            recommendations = [
-                "Обязательно связаться с пациентом",
-                "Телефонный звонок за день до приема",
-                "Рассмотреть перенос на удобное время"
-            ]
+        # Определение уровня риска с помощью улучшенной модели
+        risk_level = self.model_evaluator.get_risk_level(probability)
+        recommendations = self.model_evaluator.get_recommendations(risk_level)
         
         return {
             'probability': float(probability),
@@ -204,19 +195,28 @@ class MLService:
             'recommendations': recommendations
         }
     
-    async def _generate_explanation(self, features: np.ndarray) -> Dict:
+    async def _generate_explanation(self, features: np.ndarray) -> Optional[Dict]:
         """Генерация объяснения предсказания"""
         if not self.interpreter:
             return None
         
-        loop = asyncio.get_event_loop()
-        explanation = await loop.run_in_executor(
-            self.model_manager.executor,
-            self.interpreter.explain_prediction,
-            features
-        )
+        # Простое объяснение на основе значимости признаков
+        feature_names = self.model_manager.model_metadata.get("latest", {}).get("feature_names", [])
         
-        return explanation
+        if hasattr(self.model_manager.models["latest"], 'feature_importances_'):
+            importances = self.model_manager.models["latest"].feature_importances_
+            
+            # Топ-3 самых важных признака
+            if len(feature_names) == len(importances):
+                feature_importance = list(zip(feature_names, importances))
+                feature_importance.sort(key=lambda x: x[1], reverse=True)
+                
+                return {
+                    "top_features": feature_importance[:3],
+                    "explanation": "Предсказание основано на наиболее важных признаках"
+                }
+        
+        return {"explanation": "Объяснение недоступно для данной модели"}
 
 # Синглтон для использования в приложении
 ml_service = MLService()

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlmodel import Session, select
 
-from models.mltask import MLTask, MLTaskCreate, MLTaskUpdate, TaskStatus
+from app.models.mltask import MLTask, MLTaskCreate, MLTaskUpdate, TaskStatus
 
 class MLTaskService:
     def __init__(self, session: Session):
@@ -27,7 +27,7 @@ class MLTaskService:
     def get_all(self, skip: int = 0, limit: int = 100) -> List[MLTask]:
         """Получает список всех задач с пагинацией"""
         statement = select(MLTask).offset(skip).limit(limit)
-        return self.session.exec(statement).all()
+        return list(self.session.exec(statement).all())
 
     def update(self, task_id: int, task_update: MLTaskUpdate) -> Optional[MLTask]:
         """Обновляет существующую задачу"""

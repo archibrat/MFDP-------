@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from auth.authenticate import authenticate_cookie, authenticate
-from auth.hash_password import HashPassword
-from database.config import get_settings
+from sqlmodel import Session
+from app.database.database import get_session
+from app.auth.authenticate import authenticate_cookie, authenticate
+from app.auth.hash_password import HashPassword
+from app.database.config import get_settings
 from typing import Dict
 
 settings = get_settings()

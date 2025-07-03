@@ -8,8 +8,8 @@ from datetime import datetime
 
 from database.database import get_session
 from services.ml_service import get_ml_service, MLService
-from services.crud.prediction import PredictionService
-from models.prediction import (
+from app.services.crud.prediction import PredictionService
+from app.models.prediction import (
     PredictionRequest, PredictionResponse, BatchPredictionRequest,
     ModelStatusResponse, PatientDataCreate
 )

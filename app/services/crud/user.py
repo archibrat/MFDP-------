@@ -1,5 +1,5 @@
-from models.user import User, UserCreate
-from models.event import Event
+from app.models.user import User, UserCreate
+from app.models.event import Event
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from typing import List, Optional

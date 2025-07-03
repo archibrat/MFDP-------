@@ -36,14 +36,17 @@ class BaseResponse(BaseModel):
     """Базовая схема ответа API"""
     success: bool = True
     message: str = "Операция выполнена успешно"
+    data: Optional[Any] = Field(default=None)
 
 class PaginationParams(BaseModel):
     """Параметры пагинации"""
     page: int = Field(default=1, ge=1, description="Номер страницы")
     size: int = Field(default=10, ge=1, le=100, description="Размер страницы")
 
-class PaginatedResponse(BaseResponse):
+class PaginatedResponse(BaseModel):
     """Схема пагинированного ответа"""
+    success: bool = True
+    message: str = "Операция выполнена успешно"
     data: list
     total: int
     page: int

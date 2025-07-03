@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordRequestForm
-from database.database import get_session
-from auth.hash_password import HashPassword
-from auth.jwt_handler import create_access_token
-from models.user import User
-from services.crud import user as UserService
+from app.database.database import get_session
+from app.auth.hash_password import HashPassword
+from app.auth.jwt_handler import create_access_token
+from app.models.user import User, UserCreate
+from app.services.crud import user as UserService
 from typing import List, Dict
-from services.logging.logging import get_logger
+from app.services.logging.logging import get_logger
 
 logger = get_logger(logger_name=__name__)
 
@@ -19,7 +19,7 @@ hash_password = HashPassword()
     status_code=status.HTTP_201_CREATED,
     summary="Регистрация пользователя",
     description="Регистрация нового пользователя с помощью email и пароля")
-async def signup(user: User, session=Depends(get_session)) -> Dict[str, str]:
+async def signup(user: UserCreate, session=Depends(get_session)) -> Dict[str, str]:
     """
     Создание новой учетной записи пользователя.
 

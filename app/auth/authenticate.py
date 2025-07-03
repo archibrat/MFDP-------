@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, status 
 from fastapi.security import OAuth2PasswordBearer
-from auth.jwt_handler import verify_access_token 
-from services.auth.cookieauth import OAuth2PasswordBearerWithCookie
+from app.services.auth.cookieauth import OAuth2PasswordBearerWithCookie
+from app.auth.jwt_handler import verify_access_token 
 
 # Схема OAuth2 для получения токена из заголовка Authorization
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/signin")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
-from database.database import get_session
-from models.event import Event 
+from app.database.database import get_session
+from app.models.event import Event 
 from typing import List
 
 event_route = APIRouter()
@@ -38,10 +38,24 @@ async def retrieve_event(id: int):
         detail="Событие с указанным ID не существует"
     )
 
-@event_route.post("/new")
+@event_route.post("/")
 async def create_event(body: dict) -> dict:
     """
     Создать новое событие.
+    
+    Аргументы:
+        body (dict): Данные события
+        
+    Возвращает:
+        dict: Сообщение об успешном создании
+    """
+    events.append(body)
+    return {"message": "Событие успешно создано"}
+
+@event_route.post("/new")
+async def create_event_legacy(body: dict) -> dict:
+    """
+    Создать новое событие (устаревший endpoint).
     
     Аргументы:
         body (dict): Данные события

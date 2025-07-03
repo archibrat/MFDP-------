@@ -2,12 +2,12 @@ from typing import Optional, List, Dict, Any
 from sqlmodel import Session, select
 from services.http.base_service import BaseService
 from repositories.user_repository import UserRepository
-from models.user import User,UserCreate, UserUpdate, UserResponse
+from app.models.user import User, UserCreate, UserUpdate, UserResponse
 from auth.password_utils import password_manager
-from exceptions import ValidationException, ConflictException
+from app.exceptions.base_exception import ValidationException, ConflictException
 from services.logging.logging import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger(logger_name=__name__)
 
 class UserService(BaseService[User, UserCreate, UserUpdate, UserRepository]):
     """Сервис для работы с пользователями"""

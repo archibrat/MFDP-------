@@ -2,7 +2,7 @@ import json
 import pika
 import logging
 from typing import Optional
-from models.mltask import MLTask, TaskStatus
+from app.models.mltask import MLTask, TaskStatus
 
 # Устанавливаем уровень WARNING для логов pika
 logging.getLogger('pika').setLevel(logging.INFO)

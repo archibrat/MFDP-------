@@ -3,18 +3,14 @@ from fastapi import HTTPException
 from fastapi.security import OAuth2
 from fastapi.security.utils import get_authorization_scheme_param
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
-from database.config import get_settings
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel, OAuthFlowPassword
+from app.database.config import get_settings
 
 settings = get_settings()
 
 class OAuth2PasswordBearerWithCookie(OAuth2):
     """
-    This class is taken directly from FastAPI:
-    https://github.com/tiangolo/fastapi/blob/26f725d259c5dbe3654f221e608b14412c6b40da/fastapi/security/oauth2.py#L140-L171
-    
-    The only change made is that authentication is taken from a cookie
-    instead of from the header!
+    Класс для аутентификации через cookie (модификация FastAPI OAuth2PasswordBearer)
     """
     def __init__(
         self,
@@ -26,7 +22,7 @@ class OAuth2PasswordBearerWithCookie(OAuth2):
     ):
         if not scopes:
             scopes = {}
-        flows = OAuthFlowsModel(password={"tokenUrl": tokenUrl, "scopes": scopes})
+        flows = OAuthFlowsModel(password=OAuthFlowPassword(tokenUrl=tokenUrl, scopes=scopes))
         super().__init__(
             flows=flows,
             scheme_name=scheme_name,
@@ -35,12 +31,18 @@ class OAuth2PasswordBearerWithCookie(OAuth2):
         )
 
     async def __call__(self, request: Request) -> Optional[str]:
-        # IMPORTANT: this is the line that differs from FastAPI. Here we use 
-        # `request.cookies.get(settings.COOKIE_NAME)` instead of 
-        # `request.headers.get("Authorization")`
-        authorization: str = request.cookies.get(settings.COOKIE_NAME) 
+        authorization = request.cookies.get(settings.COOKIE_NAME)
+        if not authorization:
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            else:
+                return None
         scheme, param = get_authorization_scheme_param(authorization)
-        if not authorization or scheme.lower() != "bearer":
+        if scheme.lower() != "bearer":
             if self.auto_error:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

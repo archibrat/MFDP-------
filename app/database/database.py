@@ -1,60 +1,95 @@
-from sqlmodel import SQLModel, Session, create_engine 
-from sqlalchemy.engine import Engine
-from typing import Optional
-from database.config import get_settings
+"""
+Подключение к базе данных PostgreSQL
+"""
 
-def get_database_engine():
+from sqlalchemy import create_engine, event
+from sqlmodel import SQLModel
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+from typing import Generator
+import logging
+from sqlalchemy import text
+
+from .config import get_settings
+
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
+
+# Создание движка базы данных
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    echo=False  # Установить True для отладки SQL запросов
+)
+
+# Создание сессии
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
+
+
+def get_session() -> Generator[Session, None, None]:
     """
-    Создание и настройка движка SQLAlchemy.
+    Создание сессии базы данных для dependency injection
     
-    Возвращает:
-        Engine: Настроенный движок SQLAlchemy
+    Yields:
+        Session: Сессия SQLAlchemy
     """
-    settings = get_settings()
-    
-    # Создаем движок с настройками подключения к базе данных
-    engine = create_engine(
-        url=settings.DATABASE_URL_psycopg,
-        echo=settings.DEBUG,
-        pool_size=5,  # Размер пула соединений
-        max_overflow=10,  # Максимальное количество дополнительных соединений
-        pool_pre_ping=True,  # Проверка соединения перед использованием
-        pool_recycle=3600  # Время жизни соединения в секундах
-    )
-    return engine
-
-# Инициализация движка базы данных
-engine = get_database_engine()
-
-def get_session():
-    # Создание сессии базы данных
-    with Session(engine) as session:
+    session = SessionLocal()
+    try:
         yield session
+    except Exception as e:
+        logger.error(f"Database session error: {e}")
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
-# class DatabaseManager:
-#     _engine: Optional[Engine] = None
+
+async def init_database():
+    """Инициализация базы данных"""
+    try:
+        # Импортируем все модели для регистрации в SQLModel
+        from app.models import user, event, patient, prediction, mltask, medialog
+        
+        # Создание всех таблиц
+        SQLModel.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
+
+async def close_database():
+    """Закрытие соединения с базой данных"""
+    try:
+        engine.dispose()
+        logger.info("Database connection closed")
+    except Exception as e:
+        logger.error(f"Error closing database: {e}")
+
+
+class DatabaseManager:
+    """Менеджер для работы с базой данных"""
     
-#     @classmethod
-#     def get_engine(cls) -> Engine:
-#         if cls._engine is None:
-#             settings = get_settings()
-#             cls._engine = create_engine(
-#                 url=settings.DATABASE_URL_psycopg,
-#                 echo=settings.DEBUG,
-#                 pool_size=5,
-#                 max_overflow=10,
-#                 pool_pre_ping=True,
-#                 pool_recycle=3600
-#             )
-#         return cls._engine
+    def __init__(self):
+        self.engine = engine
+        self.SessionLocal = SessionLocal
     
-#     @classmethod
-#     def get_session(cls):
-#         with Session(cls.get_engine()) as session:
-#             yield session
-            
-#     @classmethod
-#     def close(cls):
-#         if cls._engine:
-#             cls._engine.dispose()
-#             cls._engine = None
+    def get_session(self) -> Session:
+        """Получение новой сессии"""
+        return self.SessionLocal()
+    
+    def health_check(self) -> bool:
+        """Проверка состояния подключения к базе данных"""
+        try:
+            with self.engine.connect() as connection:
+                connection.execute(text("SELECT 1")).fetchone()
+            return True
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            return False

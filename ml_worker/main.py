@@ -237,6 +237,8 @@ def test_task(
 ):
     """Отправка тестовой задачи"""
     import json
+    import uuid
+    from datetime import datetime
     
     async def send_test_task():
         settings = MLWorkerSettings()
@@ -247,12 +249,69 @@ def test_task(
             
             # Подготавливаем тестовые данные
             if input_file and input_file.exists():
-                with open(input_file, 'r') as f:
+                with open(input_file, 'r', encoding='utf-8') as f:
                     input_data = json.load(f)
             else:
-                # Тестовые данные по умолчанию
-                input_data = {
-                    "age": 45,
-                    "gender": "male",
-                    "symptoms": ["fever", "cough"]
-                }
+                # Тестовые данные по умолчанию в зависимости от типа задачи
+                if task_type == "prediction":
+                    input_data = {
+                        "patient_id": "test_patient_001",
+                        "age": 45,
+                        "gender": "male",
+                        "symptoms": ["fever", "cough", "fatigue"],
+                        "medical_history": ["diabetes", "hypertension"],
+                        "appointment_date": "2024-01-15T10:00:00Z"
+                    }
+                elif task_type == "training":
+                    input_data = {
+                        "dataset_path": "/data/training_dataset.csv",
+                        "model_type": "random_forest",
+                        "hyperparameters": {
+                            "n_estimators": 100,
+                            "max_depth": 10
+                        },
+                        "validation_split": 0.2
+                    }
+                elif task_type == "evaluation":
+                    input_data = {
+                        "model_id": "model_001",
+                        "test_dataset_path": "/data/test_dataset.csv",
+                        "metrics": ["accuracy", "precision", "recall", "f1"]
+                    }
+                else:
+                    typer.echo(f"Неизвестный тип задачи: {task_type}")
+                    typer.echo("Доступные типы: prediction, training, evaluation")
+                    return
+            
+            # Создаем сообщение задачи
+            task_message = {
+                "task_id": str(uuid.uuid4()),
+                "task_type": task_type,
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": input_data,
+                "priority": "normal",
+                "timeout": 300  # 5 минут
+            }
+            
+            # Отправляем задачу в очередь
+            await rmq_client.send_task(settings.ml_queue_name, task_message)
+            
+            typer.echo(f"Тестовая задача отправлена:")
+            typer.echo(f"  Task ID: {task_message['task_id']}")
+            typer.echo(f"  Type: {task_type}")
+            typer.echo(f"  Queue: {settings.ml_queue_name}")
+            typer.echo(f"  Data: {json.dumps(input_data, indent=2, ensure_ascii=False)}")
+            
+        except FileNotFoundError:
+            typer.echo(f"Файл не найден: {input_file}")
+            sys.exit(1)
+        except json.JSONDecodeError as e:
+            typer.echo(f"Ошибка парсинга JSON: {str(e)}")
+            sys.exit(1)
+        except Exception as e:
+            typer.echo(f"Ошибка отправки задачи: {str(e)}")
+            sys.exit(1)
+        finally:
+            await rmq_client.disconnect()
+    
+    asyncio.run(send_test_task())

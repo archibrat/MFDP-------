@@ -1,3 +1,7 @@
+from httpx import AsyncClient
+import pytest
+
+
 class TestMLIntegration:
     """Интеграционные тесты ML-компонентов"""
     

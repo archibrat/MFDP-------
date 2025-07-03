@@ -1,0 +1,47 @@
+# Dockerfile для MFDP ML Production API
+FROM python:3.11-slim
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка рабочей директории
+WORKDIR /app
+
+# Копирование файлов зависимостей
+COPY requirements_ml.txt .
+COPY app/requirements.txt ./app_requirements.txt
+
+# Установка Python зависимостей
+RUN pip install --no-cache-dir -r requirements_ml.txt
+RUN pip install --no-cache-dir -r app_requirements.txt
+
+# Копирование исходного кода
+COPY app/ ./app/
+COPY api_ml.py .
+
+# Создание директорий для ML моделей и логов
+RUN mkdir -p /app/models /app/logs
+
+# Настройка переменных окружения
+ENV PYTHONPATH=/app
+ENV DEVELOPMENT_MODE=false
+ENV ML_API_PORT=8081
+ENV ML_LOG_LEVEL=info
+
+# Создание пользователя для безопасности
+RUN useradd -m -u 1000 mfdp_ml && chown -R mfdp_ml:mfdp_ml /app
+USER mfdp_ml
+
+# Expose порта
+EXPOSE 8081
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8081/status || exit 1
+
+# Команда запуска
+CMD ["python", "api_ml.py"]

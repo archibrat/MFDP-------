@@ -4,7 +4,7 @@ from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
-    from models.user import User
+    from app.models.user import User
 
 class TaskStatus(str, Enum):
     """Статусы выполнения ML задачи"""
@@ -57,9 +57,7 @@ class MLTask(MLTaskBase, table=True):
 
 class MLTaskCreate(MLTaskBase):
     """DTO для создания новой ML задачи"""
-    question: str
-    user_id: int
-    status: TaskStatus
+    user_id: int = Field(...)
 
 class MLTaskUpdate(MLTaskBase):
     """DTO для обновления существующей ML задачи"""
