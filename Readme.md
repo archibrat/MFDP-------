@@ -48,7 +48,7 @@ RABBITMQ_HOST=rabbitmq
 RABBITMQ_PORT=5672
 RABBITMQ_USER=rmuser
 RABBITMQ_PASSWORD=rmpassword
-SECRET_KEY=ef7cb39b5097a96e496ee87383cf9d853706151497015a826120db8e25084ef3
+SECRET_KEY=
 DEBUG=True
 LOG_LEVEL=INFO
 ML_MODEL_PATH=./models
@@ -90,6 +90,34 @@ sleep 30
 │   PostgreSQL    │    │     Redis       │    │   RabbitMQ      │
 │   (База данных) │    │   (Кэш)         │    │ (Очередь задач) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+## Схема компонентов
+``` mermaid 
+graph TB
+    subgraph "Frontend Layer"
+        A[Streamlit UI] --> B[FastAPI Gateway]
+        A --> C[Web Interface]
+    end
+    subgraph "API Layer"
+        B --> D[Authentication Service]
+        B --> E[ML Prediction Service]
+        B --> F[Analytics Service]
+    end
+    subgraph "ML Layer"
+        E --> G[LightGBM Model]
+        E --> H[XGBoost Model]
+        E --> I[Stacking Ensemble]
+    end
+    subgraph "Data Layer"
+        J[PostgreSQL] --> K[Redis Cache]
+        L[RabbitMQ] --> M[ML Workers]
+        N[Airflow ETL] --> J
+    end
+
+    subgraph "Monitoring"
+        O[Prometheus] --> P[Grafana]
+        Q[Health Checks] --> O
+    end
 ```
 
 ## Основные модули
@@ -238,5 +266,5 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8080
 
 ---
 
-**MFDP Team** | Версия 1.0 | 2024
+**MFDP Team** | Версия 1.0 | 2025
 
